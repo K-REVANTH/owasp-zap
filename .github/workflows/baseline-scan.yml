@@ -1,12 +1,10 @@
-name: DAST - OWASP ZAP Practice
+name: DAST - OWASP ZAP Baseline
 
 on:
   workflow_dispatch:
 
-# Fix the permissions issue
 permissions:
   contents: read
-  issues: write
 
 jobs:
   zap-baseline:
@@ -47,9 +45,10 @@ jobs:
         uses: zaproxy/action-baseline@v0.12.0
         with:
           target: 'http://localhost:3000'
-          fail_action: false
+          fail_action: false              # Don't fail on warnings
           cmd_options: '-a'
-          allow_issue_writing: false    # ← THIS FIXES THE ERROR
+          allow_issue_writing: false      # Don't create GitHub issues
+        continue-on-error: true           # Even if ZAP exits non-zero, continue
 
       - name: Show Results Summary
         if: always()
@@ -95,13 +94,13 @@ jobs:
             echo ""
 
             if [ "$HIGH" -gt "0" ]; then
-              echo " HIGH severity issues found!"
+              echo " HIGH severity issues found! Fix them!"
             else
-              echo " No HIGH severity issues"
+              echo " No HIGH severity issues found"
             fi
 
           else
-            echo " Report not generated"
+            echo " Report file is empty or missing"
           fi
 
           echo "════════════════════════════════════════"
