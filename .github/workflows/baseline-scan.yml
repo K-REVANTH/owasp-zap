@@ -1,7 +1,12 @@
-name: DAST - OWASP ZAP Baseline Scan
+name: DAST - OWASP ZAP Practice
 
 on:
   workflow_dispatch:
+
+# Fix the permissions issue
+permissions:
+  contents: read
+  issues: write
 
 jobs:
   zap-baseline:
@@ -23,7 +28,7 @@ jobs:
           echo "Waiting for Juice Shop..."
           for i in {1..30}; do
             if curl -s http://localhost:3000 > /dev/null; then
-              echo "Juice Shop is up"
+              echo "✅ Juice Shop is up!"
               exit 0
             fi
             echo "Still waiting... attempt $i"
@@ -32,10 +37,8 @@ jobs:
           echo "Juice Shop did not start in time"
           exit 1
 
-      # ── THIS IS THE FIX ──────────────────────────
       - name: Fix Permissions for ZAP
         run: |
-          mkdir -p zap-reports
           chmod 777 $GITHUB_WORKSPACE
           touch report_html.html report_json.json report_md.md
           chmod 777 report_html.html report_json.json report_md.md
@@ -46,26 +49,17 @@ jobs:
           target: 'http://localhost:3000'
           fail_action: false
           cmd_options: '-a'
-
-      - name: Upload ZAP Report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-baseline-report
-          path: |
-            report_html.html
-            report_json.json
-            report_md.md
-          if-no-files-found: ignore
+          allow_issue_writing: false    # ← THIS FIXES THE ERROR
 
       - name: Show Results Summary
         if: always()
         run: |
           echo "════════════════════════════════════════"
-          echo "  ZAP BASELINE SCAN RESULTS"
+          echo "       ZAP BASELINE SCAN RESULTS"
           echo "════════════════════════════════════════"
 
           if [ -f report_json.json ] && [ -s report_json.json ]; then
+
             HIGH=$(python3 -c "
           import json
           d=json.load(open('report_json.json'))
@@ -87,11 +81,38 @@ jobs:
           print(len([a for a in alerts if a.get('riskcode')=='1']))
           " 2>/dev/null || echo "0")
 
-            echo " High:   $HIGH"
-            echo " Medium: $MEDIUM"
-            echo " Low:    $LOW"
+            INFO=$(python3 -c "
+          import json
+          d=json.load(open('report_json.json'))
+          alerts=[a for s in d.get('site',[]) for a in s.get('alerts',[])]
+          print(len([a for a in alerts if a.get('riskcode')=='0']))
+          " 2>/dev/null || echo "0")
+
+            echo " High:          $HIGH"
+            echo " Medium:        $MEDIUM"
+            echo " Low:           $LOW"
+            echo " Informational: $INFO"
+            echo ""
+
+            if [ "$HIGH" -gt "0" ]; then
+              echo " HIGH severity issues found!"
+            else
+              echo " No HIGH severity issues"
+            fi
+
           else
-            echo "  Report not generated properly"
+            echo " Report not generated"
           fi
 
           echo "════════════════════════════════════════"
+
+      - name: Upload ZAP Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-baseline-report
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+          if-no-files-found: ignore
