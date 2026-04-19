@@ -1,4 +1,4 @@
-name: DAST - OWASP ZAP Practice
+name: DAST - OWASP ZAP Baseline Scan
 
 on:
   workflow_dispatch:
